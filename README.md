@@ -1,0 +1,182 @@
+# Big-Data-Project---Hadoop-MapReduce
+Un projet complet démontrant l'utilisation de Hadoop, HDFS et MapReduce pour le traitement de données à grande échelle.
+# PROJET BIG DATA - HADOOP & MAPREDUCE
+
+## 1. Installation du Cluster Hadoop
+
+### Prérequis
+- Installer Docker
+
+### Étapes d'installation
+
+1. Télécharger l'image hadoop-spark-cluster :
+   docker pull yassern1/hadoop-spark-jupyter:1.0.3
+
+2. Création d'un volume de partage :
+   Pour mon cas : C:\Users\pc\Documents\hadoop_project
+
+3. Création des trois conteneurs :
+
+   a. Créer un réseau pour relier les conteneurs :
+      docker network create --driver=bridge hadoop
+
+   b. Créer et lancer les trois conteneurs :
+
+      - Conteneur 1 : hadoop-master
+        docker run -itd -v C:\Users\pc\Documents\hadoop_project/:/shared_volume --net=hadoop -p 9870:9870 -p 8088:8088 -p 7077:7077 -p 19888:19888 --name hadoop-master --hostname hadoop-master yassern1/hadoop-spark-jupyter:1.0.3
+
+      - Conteneur 2 : hadoop-slave1
+        docker run -itd -p 8040:8042 --net=hadoop --name hadoop-slave1 --hostname hadoop-slave1 yassern1/hadoop-spark-jupyter:1.0.3
+
+      - Conteneur 3 : hadoop-slave2
+        docker run -itd -p 8041:8042 --net=hadoop --name hadoop-slave2 --hostname hadoop-slave2 yassern1/hadoop-spark-jupyter:1.0.3
+
+4. Configuration initiale :
+
+   a. Accéder au master :
+      docker exec -it hadoop-master bash
+
+   b. Démarrer Hadoop et YARN :
+      ./start-hadoop.sh
+
+   c. Créer les répertoires HDFS :
+      hadoop fs -mkdir -p /user/root
+      hdfs dfs -mkdir input
+
+5. Copier des fichiers vers HDFS :
+
+   a. Placer les fichiers dans le dossier hadoop_project sur la machine locale
+   b. Copier vers HDFS depuis le conteneur :
+      hdfs dfs -put /shared_volume/datasets/fichier.txt input/
+
+
+## 2. Programmation avec l'API HDFS
+
+### Structure du projet
+- Créer un projet Maven nommé "BigData"
+- Créer le package : edu.ensias.bigdata.tp1
+
+### Application 1 : HadoopFileStatus
+- Créer la classe HadoopFileStatus.java
+- Extraire vers le JAR : C:\Users\pc\Documents\hadoop_project\HadoopFileStatus.jar
+- Commande d'exécution :
+  hadoop jar /shared_volume/HadoopFileStatus.jar edu.ensias.bigdata.tp1.HadoopFileStatus /user/root/input purchases.txt nouveau_nom.txt
+
+### Application 2 : HDFSInfo
+- Créer la classe HDFSInfo.java
+- Extraire le JAR vers shared_volume
+- Commande d'exécution :
+  hadoop jar /shared_volume/HDFSInfo.jar edu.ensias.bigdata.tp1.HDFSInfo /user/root/input/new.txt
+
+### Application 3 : ReadHDFS
+- Créer la classe ReadHDFS.java
+- Extraire le JAR vers shared_volume
+- Commande d'exécution :
+  hadoop jar /shared_volume/ReadHDFS.jar edu.ensias.bigdata.tp1.ReadHDFS /user/root/input/purchases.txt
+
+### Application 4 : HDFSWrite
+- Créer la classe HDFSWrite.java
+- Extraire le JAR vers shared_volume
+- Commande d'exécution :
+  hadoop jar /shared_volume/HDFSWrite.jar edu.ensias.bigdata.tp1.HDFSWrite /user/root/output/message.txt "dadiiii"
+
+
+## 3. Programmation avec l'API MapReduce
+
+### Objectif
+Simuler l'exemple WordCount pour compter le nombre d'occurrences de chaque mot dans un fichier texte.
+
+### Architecture du traitement
+- Phase de Mapping : Découpe le texte en mots et génère des paires (mot, 1)
+- Phase de Reducing : Regroupe par mot et fait la somme des occurrences
+
+### Implémentation
+
+1. Structure du projet :
+   - Créer le package : edu.ensias.hadoop.mapreducelab
+   - Emplacement : src/main/java/edu/ensias/hadoop/
+
+2. Classes à créer :
+
+   a. TokenizerMapper (Mapper)
+      - Prend chaque ligne de texte
+      - Tokenise en mots
+      - Émet des paires (mot, 1)
+
+   b. IntSumReducer (Reducer)
+      - Agrège les valeurs pour chaque clé
+      - Calcule la somme des occurrences
+      - Émet des paires (mot, total)
+
+   c. WordCount (Classe principale)
+      - Configure et lance le job MapReduce
+      - Définit les classes Mapper et Reducer
+      - Spécifie les chemins d'entrée/sortie
+
+3. Déploiement et exécution :
+
+   a. Exporter le projet en JAR vers shared_volume local
+   b. Dans le bash de Hadoop master, exécuter :
+      hadoop jar /shared_volume/WordCount.jar input/new.txt output2/resultat
+
+### Notes importantes
+- Le répertoire de sortie ne doit pas exister avant l'exécution
+- Utiliser : hadoop fs -rm -r output2/resultat pour supprimer l'ancien résultat
+- Vérifier les résultats avec : hadoop fs -cat output2/resultat/part-r-00000
+
+
+## 4. MapReduce avec Python
+
+### Objectif
+Implémenter l'exemple wordcount avec MapReduce en Python et l'utilitaire Hadoop Streaming.
+
+### Étapes d'exécution
+
+1. Préparation des fichiers :
+   - Créer deux fichiers Python : mapper.py et reducer.py
+   - Créer un fichier alice.txt (contenant le texte à analyser)
+   - Placer ces fichiers dans le dossier /shared_volume/python/
+
+2. Contenu des fichiers Python :
+
+mapper.py
+reducer.py
+
+3. Exécution dans le bash du master :
+
+# Accéder au conteneur et vérifier les fichiers
+cd /shared_volume/python
+ls -la mapper.py reducer.py alice.txt
+
+# Trouver le JAR Hadoop Streaming
+find / -name "hadoop-streaming*.jar" 2>/dev/null
+# Résultat attendu : /usr/local/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.2.0.jar
+
+# Tester les scripts Python localement
+cat alice.txt | python3 mapper.py
+cat alice.txt | python3 mapper.py | sort | python3 reducer.py
+
+# Donner les permissions d'exécution
+chmod +x mapper.py reducer.py
+
+# Copier le fichier vers HDFS
+hadoop fs -put alice.txt input/
+
+# Exécuter le job MapReduce avec Hadoop Streaming
+hadoop jar /usr/local/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.2.0.jar \
+    -files /shared_volume/python/mapper.py,/shared_volume/python/reducer.py \
+    -mapper "python3 mapper.py" \
+    -reducer "python3 reducer.py" \
+    -input input/alice.txt \
+    -output output_python_wordcount
+
+4. Vérification des résultats :
+
+# Lister les fichiers de sortie
+hadoop fs -ls output_python_wordcount
+
+# Afficher le résultat complet
+hadoop fs -cat output_python_wordcount/part-00000
+
+# Afficher les premiers résultats
+hadoop fs -cat output_python_wordcount/part-00000 | head -20
